@@ -1,0 +1,37 @@
+
+
+##ProductsSales_by_Territory
+
+CREATE OR ALTER VIEW ProductsSales_by_Territory as
+
+SELECT [SOD].[SalesOrderID], [P].[Name] as Product, [SOD].[UnitPrice], [P].[StandardCost], [SOD].[OrderQty],
+([SOD].[OrderQty] * [SOD].[UnitPrice] ) as TotalSales,
+([SOD].[OrderQty] * [P].[StandardCost] ) as TotalCost,
+
+( [T].[Name] + ' - ' + [T].[Group]) as TerritoryGroup
+FROM [Sales].[SalesOrderDetail] as [SOD]
+INNER JOIN [Sales].[SalesOrderHeader] as [SOH]
+	ON [SOD].[SalesOrderID] = [SOH].[SalesOrderID]
+INNER JOIN [Sales].[SalesTerritory] as [T]
+	ON [SOH].[TerritoryID] = [T].[TerritoryID]
+INNER JOIN [Production].[Product] as [P]
+	ON [P].[ProductID] = [SOD].[ProductID]
+
+
+##Ranking Products by Territory
+
+SELECT * FROM
+	(SELECT *, rank() over (partition by TerritoryGroup order by Sales desc) as ProductRank FROM
+
+		(SELECT TerritoryGroup, Product, Round(SUM(TotalSales), 2) as Sales 
+		FROM ProductsSales_by_Territory
+		GROUP BY TerritoryGroup, Product) z )y
+WHERE ProductRank IN (1,2,3)
+
+
+##Products Margins
+
+SELECT *, ((Sales - Costs) / Sales) as Margin FROM 
+	(SELECT  Product, Round(SUM(TotalSales), 2) as Sales, Round(SUM(TotalCost), 2) as Costs
+		FROM ProductsSales_by_Territory
+		GROUP BY  Product) x
